@@ -90,11 +90,7 @@ stages:
           - task: Bash@3
             inputs:
              targetType: 'inline'
-             script: 'java -jar /home/azureuser/myagent/_work/2/s/FunctionalTesting/testing.jar' 
-          - task: Bash@3
-            inputs:
-             targetType: 'inline'
-             script: 'ssh azureuser@9.234.140.212 ansible-playbook delete_myapp.yml -b ' (before create ansible playbook)
+             script: 'java -jar /home/azureuser/myagent/_work/2/s/FunctionalTesting/testing.jar'
   - stage: DeployToAKS
     displayName: DeployToAKS
     jobs:
