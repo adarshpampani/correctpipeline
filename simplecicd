@@ -1,0 +1,67 @@
+# Maven
+# Build your Java project and run tests with Apache Maven.
+# Add steps that analyze code, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/java
+
+trigger:
+- master
+
+pool:
+  name: 'agent'
+
+steps:
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: 'git clone https://github.com/IntelliqDevops/maven.git'
+
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: 'cd /home/azureuser/myagent/_work/1/s;mvn package'
+
+# --- TESTING ENVIRONMENT DEPLOYMENT & ROLLBACK ---
+
+# 1. Take a backup of the existing testapp.war on the testing server, then deploy the new one
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: |
+      ssh azureuser@20.246.80.119 "if [ -f /var/lib/tomcat10/webapps/testapp.war ]; then cp /var/lib/tomcat10/webapps/testapp.war /var/lib/tomcat10/webapps/testapp.war.bak; fi"
+      scp /home/azureuser/myagent/_work/1/s/webapp/target/webapp.war azureuser@20.246.80.119:/var/lib/tomcat10/webapps/testapp.war
+
+# 2. Clone and run functional tests
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: 'git clone https://github.com/IntelliqDevops/FunctionalTesting.git'
+
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: 'java -jar /home/azureuser/myagent/_work/1/s/FunctionalTesting/testing.jar'
+
+# 3. ROLLBACK for Testing: Runs automatically ONLY if any step above fails
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: 'ssh azureuser@20.246.80.119 "if [ -f /var/lib/tomcat10/webapps/testapp.war.bak ]; then cp /var/lib/tomcat10/webapps/testapp.war.bak /var/lib/tomcat10/webapps/testapp.war; fi"'
+  condition: failed()
+
+
+# --- PRODUCTION ENVIRONMENT DEPLOYMENT & ROLLBACK ---
+
+# 4. Take a backup of the existing prodapp.war on the production server, then deploy the new one
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: |
+      ssh azureuser@20.81.163.109 "if [ -f /var/lib/tomcat10/webapps/prodapp.war ]; then cp /var/lib/tomcat10/webapps/prodapp.war /var/lib/tomcat10/webapps/prodapp.war.bak; fi"
+      scp /home/azureuser/myagent/_work/1/s/webapp/target/webapp.war azureuser@20.81.163.109:/var/lib/tomcat10/webapps/prodapp.war
+
+# 5. ROLLBACK for Production: Runs automatically ONLY if the production deployment step fails
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: 'ssh azureuser@20.81.163.109 "if [ -f /var/lib/tomcat10/webapps/prodapp.war.bak ]; then cp /var/lib/tomcat10/webapps/prodapp.war.bak /var/lib/tomcat10/webapps/prodapp.war; fi"'
+  condition: failed()
