@@ -111,7 +111,9 @@ stages:
           - task: Bash@3
             inputs:
               targetType: 'inline'
-              script: 'ssh azureuser@9.234.140.212 ansible-playbook delete_myapp.yml -b'
+              script: 'ssh azureuser@9.234.140.212 ansible-playbook delete_myapp.yml -b' (or) (it will simply delete the newer container)
+              script: 'ssh azureuser@9.234.140.212 ansible-playbook rollback_myapp.yml -b' (it will delete the newer container and create 
+                      the container from the older image because the playbook has login to acr, delete the newer container and older image)
 
   - stage: DeployToAKS
     displayName: DeployToAKS
