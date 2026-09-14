@@ -1,0 +1,66 @@
+trigger:
+- master
+
+pool:
+  name: 'agent'
+
+variables:
+  testServer: '20.246.80.119'
+  prodServer: '20.81.163.109'
+  sshUser: 'azureuser'
+  
+  # Custom path variables to avoid repeating them
+  testWar: '/var/lib/tomcat10/webapps/testapp.war'
+  prodWar: '/var/lib/tomcat10/webapps/prodapp.war'
+
+steps:
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: 'git clone https://github.com/IntelliqDevops/maven.git'
+
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: 'cd $(Build.SourcesDirectory)/maven && mvn package'
+
+# --- TESTING ENVIRONMENT DEPLOYMENT & ROLLBACK ---
+
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: |
+      ssh $(sshUser)@$(testServer) "if [ -f $(testWar) ]; then cp $(testWar) $(testWar).bak; fi"
+      scp $(mavenSource)/webapp/target/webapp.war $(sshUser)@$(testServer):$(testWar)
+
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: 'git clone https://github.com/IntelliqDevops/FunctionalTesting.git'
+
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: 'java -jar $(Build.SourcesDirectory)/FunctionalTesting/testing.jar'
+
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: 'ssh $(sshUser)@$(testServer) "if [ -f $(testWar).bak ]; then cp $(testWar).bak $(testWar); fi"'
+  condition: failed()
+
+
+# --- PRODUCTION ENVIRONMENT DEPLOYMENT & ROLLBACK ---
+
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: |
+      ssh $(sshUser)@$(prodServer) "if [ -f $(prodWar) ]; then cp $(prodWar) $(prodWar).bak; fi"
+      scp $(mavenSource)/webapp/target/webapp.war $(sshUser)@$(prodServer):$(prodWar)
+
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: 'ssh $(sshUser)@$(prodServer) "if [ -f $(prodWar).bak ]; then cp $(prodWar).bak $(prodWar); fi"'
+  condition: failed()
