@@ -8,102 +8,159 @@ trigger:
 
 pool:
   name: 'agent1'
+
 stages:
   - stage: Download
     displayName: Download
     jobs:
-      - job: Dwonload
+      - job: DownloadJob
         displayName: Download
         steps:
           - task: Bash@3
             inputs:
-             targetType: 'inline'
-             script: 'git clone https://github.com/IntelliqDevops/maven.git'
+              targetType: 'inline'
+              script: 'git clone https://github.com/IntelliqDevops/maven.git'
+
   - stage: Build
     displayName: Build
     jobs:
-      - job: Build
+      - job: BuildJob
         displayName: Build
         steps:
           - task: Bash@3
             inputs:
-             targetType: 'inline'
-             script: 'cd /home/azureuser/myagent/_work/2/s;mvn package'
+              targetType: 'inline'
+              script: 'cd /home/azureuser/myagent/_work/2/s; mvn package'
           - task: Bash@3
             inputs:
-             targetType: 'inline'
-             script: 'cp /home/azureuser/myagent/_work/2/s/webapp/target/webapp.war /home/azureuser'
+              targetType: 'inline'
+              script: 'cp /home/azureuser/myagent/_work/2/s/webapp/target/webapp.war /home/azureuser'
+
   - stage: CreateDockerFileandImage
     displayName: CreateDockerFile
     jobs:
-      - job: CreateDockerFileand
-        displayName: CreateDockerFileand
+      - job: CreateDockerFileJob
+        displayName: CreateDockerFile
         steps:
           - task: Bash@3
             inputs:
-             targetType: 'inline'
-             script: |
-               cat <<EOF > /home/azureuser/dockerfile
-               FROM tomee
-               COPY webapp.war /usr/local/tomee/webapps/testapp.war
-               EOF
+              targetType: 'inline'
+              script: |
+                cat <<EOF > /home/azureuser/dockerfile
+                FROM tomee
+                COPY webapp.war /usr/local/tomee/webapps/testapp.war
+                EOF
+
   - stage: BuilDockerImage
     displayName: BuilDockerImage
     jobs:
-      - job: BuilDockerImage
+      - job: BuilDockerImageJob
         displayName: BuilDockerImage
         steps:
           - task: Bash@3
             inputs:
-             targetType: 'inline'
-             script: 'cd /home/azureuser;docker build -t intelliqitjava.azurecr.io/myapp .'
+              targetType: 'inline'
+              script: 'cd /home/azureuser; docker build -t intelliqitjava.azurecr.io/myapp .'
+
   - stage: PushDockerImage
     displayName: PushDockerImage
     jobs:
-      - job: PushDockerImage
+      - job: PushDockerImageJob
         displayName: PushDockerImage
         steps:
           - task: Bash@3
             inputs:
-             targetType: 'inline'
-             script: 'docker push intelliqitjava.azurecr.io/myapp'
+              targetType: 'inline'
+              script: 'docker push intelliqitjava.azurecr.io/myapp'
+
   - stage: DeployToQA
     displayName: DeployToQA
     jobs:
-      - job: DeployToQA
+      - job: DeployToQAJob
         displayName: DeployToQA
         steps:
           - task: Bash@3
             inputs:
-             targetType: 'inline'
-             script: 'ssh azureuser@9.234.140.212 ansible-playbook myapp.yml -b '  (before this we need to create ansible playbook for login to acr  and creating the containers) 
+              targetType: 'inline'
+              script: 'ssh azureuser@9.234.140.212 ansible-playbook myapp.yml -b' (create 1 ansible playbook for login to acr and create containers of the docker image)
   - stage: RunSelenium
     displayName: RunSelenium
     jobs:
-      - job: RunSelenium
+      - job: RunSeleniumJob
         displayName: RunSelenium
         steps:
           - task: Bash@3
             inputs:
-             targetType: 'inline'
-             script: 'git clone https://github.com/IntelliqDevops/FunctionalTesting.git' 
+              targetType: 'inline'
+              script: 'git clone https://github.com/IntelliqDevops/FunctionalTesting.git'
           - task: Bash@3
             inputs:
-             targetType: 'inline'
-             script: 'java -jar /home/azureuser/myagent/_work/2/s/FunctionalTesting/testing.jar'
+              targetType: 'inline'
+              script: 'java -jar /home/azureuser/myagent/_work/2/s/FunctionalTesting/testing.jar'
+
+  - stage: RollbackQA
+    displayName: Rollback QA Environment
+    condition: failed()
+    dependsOn:
+      - DeployToQA
+      - RunSelenium
+    jobs:
+      - job: RollbackQAJob
+        displayName: Rollback QA Container
+        steps:
+          - task: Bash@3
+            inputs:
+              targetType: 'inline'
+              script: 'ssh azureuser@9.234.140.212 ansible-playbook delete_myapp.yml -b'
+
   - stage: DeployToAKS
     displayName: DeployToAKS
+    dependsOn: RunSelenium
     jobs:
-      - job: DeployToAKS
+      - job: DeployToAKSJob
         displayName: DeployToAKS
         steps:
-         - task: KubernetesManifest@1
-           inputs:
-            action: 'deploy'
-            connectionType: 'azureResourceManager'
-            azureSubscriptionConnection: 'Azure subscription 1(2fa156ff-be60-46ef-b21b-546fa6d14cf1)'
-            azureResourceGroup: 'ci-cd'
-            kubernetesCluster: 'cluster-1'
-            useClusterAdmin: true
-            manifests: 'myapp.yml'
-  
+          - task: KubernetesManifest@1
+            inputs:
+              action: 'deploy'
+              connectionType: 'azureResourceManager'
+              azureSubscriptionConnection: 'Azure subscription 1(2fa156ff-be60-46ef-b21b-546fa6d14cf1)'
+              azureResourceGroup: 'ci-cd'
+              kubernetesCluster: 'cluster-1'
+              useClusterAdmin: true
+              manifests: 'myapp.yml'
+
+  - stage: RollbackAKS  ( for canary type deployments)
+    displayName: Rollback AKS Deployment
+    condition: failed()
+    dependsOn: DeployToAKS
+    jobs:
+      - job: RollbackAKSJob
+        displayName: Rollback AKS
+        steps:
+          - task: KubernetesManifest@1
+            inputs:
+              action: 'reject'
+              connectionType: 'azureResourceManager'
+              azureSubscriptionConnection: 'Azure subscription 1(2fa156ff-be60-46ef-b21b-546fa6d14cf1)'
+              azureResourceGroup: 'ci-cd'
+              kubernetesCluster: 'cluster-1'
+              useClusterAdmin: true
+              manifests: 'myapp.yml'
+- stage: RollbackAKS ( for standard deployments)
+    displayName: Rollback AKS Deployment
+    condition: failed()
+    dependsOn: DeployToAKS
+    jobs:
+      - job: RollbackAKSJob
+        displayName: Rollback AKS
+        steps:
+          - task: Kubernetes@1
+            inputs:
+              connectionType: 'Azure Resource Manager'
+              azureSubscriptionReference: 'Azure subscription 1(2fa156ff-be60-46ef-b21b-546fa6d14cf1)'
+              azureResourceGroup: 'ci-cd'
+              kubernetesCluster: 'cluster-1'
+              useClusterAdmin: true
+              command: 'rollout'
+              arguments: 'undo deployment/myapp'
