@@ -115,7 +115,7 @@ stages:
               script: 'ssh azureuser@9.234.140.212 ansible-playbook rollback_myapp.yml -b' (it will delete the newer container and create 
                       the container from the older image because the playbook has login to acr, delete the newer container and older image)
 
-  - stage: DeployToAKS
+  - stage: DeployToAKS  ( before connect your aks to the acr and create 1 yaml for deployment and service file for the acr uploaded image)
     displayName: DeployToAKS
     dependsOn: RunSelenium
     jobs:
