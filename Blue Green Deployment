@@ -1,0 +1,59 @@
+# Blue Deployment (Current Live - v1.28)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-blue
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+      version: "1.28"
+  template:
+    metadata:
+      labels:
+        app: nginx
+        version: "1.28"
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.28
+        ports:
+        - containerPort: 80
+---
+# Green Deployment (New Version - v1.29)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-green
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+      version: "1.29"
+  template:
+    metadata:
+      labels:
+        app: nginx
+        version: "1.29"
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.29
+        ports:
+        - containerPort: 80
+---
+# Shared Service (Points to Blue initially; change version label to "1.29" to cut over)
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  selector:
+    app: nginx
+    version: "1.28" # Switch to "1.29" to complete the cutover
+  ports:
+  - port: 80
+    targetPort: 80
+  type: ClusterIP
