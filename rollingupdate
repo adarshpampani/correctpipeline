@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-rolling
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1       # Number of extra pods allowed during update
+      maxUnavailable: 0 # Ensures zero downtime by keeping all pods running
+  selector:
+    matchLabels:
+      app: nginx
+      track: stable
+  template:
+    metadata:
+      labels:
+        app: nginx
+        track: stable
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.29 # Upgraded from 1.28
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  selector:
+    app: nginx
+    track: stable
+  ports:
+  - port: 80
+    targetPort: 80
+  type: ClusterIP
