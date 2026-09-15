@@ -1,0 +1,56 @@
+# Baseline / Stable Deployment (v1.28 - 90% traffic)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-stable
+spec:
+  replicas: 9
+  selector:
+    matchLabels:
+      app: nginx-app
+  template:
+    metadata:
+      labels:
+        app: nginx-app
+        track: stable
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.28
+        ports:
+        - containerPort: 80
+---
+# Canary Deployment (v1.29 - 10% traffic)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-canary
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-app
+  template:
+    metadata:
+      labels:
+        app: nginx-app
+        track: canary
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.29
+        ports:
+        - containerPort: 80
+---
+# Unified Service (Targeting app: nginx-app routes traffic proportionally to both deployments)
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  selector:
+    app: nginx-app
+  ports:
+  - port: 80
+    targetPort: 80
+  type: ClusterIP
