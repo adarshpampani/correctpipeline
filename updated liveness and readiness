@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+        
+        # 1. Startup Probe: Grants up to 50 seconds (10s x 5 attempts) to boot.
+        # Liveness and readiness are paused until this succeeds.
+        startupProbe:
+          httpGet:
+            path: /
+            port: 80
+          periodSeconds: 10
+          failureThreshold: 5
+          
+        # 2. Readiness Probe: Takes over only AFTER startup completes.
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+          
+        # 3. Liveness Probe: Takes over only AFTER startup completes.
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
