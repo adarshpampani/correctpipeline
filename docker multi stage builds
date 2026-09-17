@@ -1,0 +1,64 @@
+Think of a multi-stage build like baking a cake for a bakery.
+
+Stage 1 is the Kitchen. It is filled with heavy equipment (mixers, ovens) and raw ingredients (flour, eggs). By the end of baking, the kitchen is a mess, but you have a finished cake.
+Stage 2 is the Display Case. You don't want to show your customers the dirty mixing bowls or the empty eggshells. You only want to move the finished cake into a clean, simple display case.
+
+Here is exactly what that code is doing, line by line, using that analogy.
+
+Stage 1: The Kitchen (Building the App)
+FROM node:18 AS builder
+We are renting a fully equipped "kitchen" (a computer environment that has Node.js installed) and naming it builder.
+
+WORKDIR /app
+We are setting up a specific countertop named /app to do all of our mixing and baking.
+
+COPY package.json package-lock.json ./
+RUN npm install
+We are bringing in our recipe (package.json) and telling the computer to go fetch all the raw ingredients (dependencies) we need to bake.
+
+COPY . .
+RUN npm run build
+We bring in the rest of our raw code files and "bake" them. npm run build transforms the raw code into a finished, ready-to-use website. This finished website is now sitting in a folder called /app/build.
+
+(Right now, our Docker container is huge because it contains all the heavy Node.js software, the raw code, and the leftover junk from the building process. We don't want to send this to our users.)
+
+Stage 2: The Display Case (Running the App)
+FROM nginx:alpine
+We start a completely new, second stage. This is our "display case." Nginx is a very lightweight web server. It doesn't know how to build code; it only knows how to show web pages to users.
+
+COPY --from=builder /app/build /usr/share/nginx/html
+This is the magic line. We tell Docker: "Reach back into that messy builder kitchen, grab only the finished cake from the /app/build folder, and place it directly into the Nginx display case."
+
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+We open the front doors of the bakery so customers can come in (port 80) and turn on the display case (starting the web server).
+
+When Docker finishes this process, it entirely deletes the "kitchen" (Stage 1) and throws it away. The only thing you are left with is the tiny, clean "display case" (Stage 2) holding your finished website.
+
+# ==========================================
+# STAGE 1: The Builder (Heavy)
+# ==========================================
+# Name this stage 'builder' so we can reference it later
+FROM node:18 AS builder
+WORKDIR /app
+
+# Copy dependency files and install them
+COPY package.json package-lock.json ./
+RUN npm install
+
+# Copy the rest of the code and compile the application
+COPY . .
+RUN npm run build
+
+# ==========================================
+# STAGE 2: The Production Environment (Lightweight)
+# ==========================================
+# Start completely fresh with a tiny web server image
+FROM nginx:alpine
+
+# ONLY copy the finished, compiled files from the 'builder' stage above
+COPY --from=builder /app/build /usr/share/nginx/html
+
+# Expose port 80 and start the server
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
